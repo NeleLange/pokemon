@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poké-Randomizer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React und ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel für JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* Pixel Art Rendering für die Sprites */
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        body {
+            background-color: #0f172a; /* Slate 900 fallback */
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICON KOMPONENTEN (Inline SVGs statt Lucide Import) ---
+        const IconBase = ({ size = 24, className = "", children }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const Sparkles = (props) => (
+            <IconBase {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></IconBase>
+        );
+        const Save = (props) => (
+            <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>
+        );
+        const Trash2 = (props) => (
+            <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>
+        );
+        const RefreshCw = (props) => (
+            <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></IconBase>
+        );
+        const Brain = (props) => (
+            <IconBase {...props}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 12.578c.07-1.25.5-2.42 1.171-3.439"/><path d="M19.353 9.139a6.002 6.002 0 0 1 1.169 3.439"/><path d="M12 18v2"/><path d="M6 18v2"/><path d="M18 18v2"/></IconBase>
+        );
+        const Dna = (props) => (
+            <IconBase {...props}><path d="M2 15c6.667-6 13.333 0 20-6"/><path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"/><path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"/><path d="M17 6l-2.5-2.5"/><path d="M14 8l-1-1"/><path d="M7 18l2.5 2.5"/><path d="M3.5 14.5l.5.5"/><path d="M20 9l.5.5"/><path d="M6.5 12.5l1 1"/><path d="M16.5 10.5l1 1"/><path d="M10 16l-1 1"/></IconBase>
+        );
+        const Swords = (props) => (
+            <IconBase {...props}><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" y1="14" x2="9" y2="18"/><line x1="7" y1="17" x2="4" y2="20"/><line x1="2" y1="19" x2="4" y2="21"/></IconBase>
+        );
+        const Zap = (props) => (
+            <IconBase {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconBase>
+        );
+        const ExternalLink = (props) => (
+            <IconBase {...props}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></IconBase>
+        );
+        const Sword = (props) => (
+            <IconBase {...props}><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/></IconBase>
+        );
+        const Circle = (props) => (
+            <IconBase {...props}><circle cx="12" cy="12" r="10"/></IconBase>
+        );
+
+
+        // --- STATISCHE DATEN ---
+        const NATURE_TRANSLATIONS = {
+            "hardy": { name: "Robust", buff: "", nerf: "" },
+            "lonely": { name: "Solo", buff: "Ang", nerf: "Ver" },
+            "brave": { name: "Mutig", buff: "Ang", nerf: "Ini" },
+            "adamant": { name: "Hart", buff: "Ang", nerf: "SpA" },
+            "naughty": { name: "Frech", buff: "Ang", nerf: "SpV" },
+            "bold": { name: "Kühn", buff: "Ver", nerf: "Ang" },
+            "docile": { name: "Sanft", buff: "", nerf: "" },
+            "relaxed": { name: "Locker", buff: "Ver", nerf: "Ini" },
+            "impish": { name: "Pfiffig", buff: "Ver", nerf: "SpA" },
+            "lax": { name: "Lasch", buff: "Ver", nerf: "SpV" },
+            "timid": { name: "Scheu", buff: "Ini", nerf: "Ang" },
+            "hasty": { name: "Hastig", buff: "Ini", nerf: "Ver" },
+            "serious": { name: "Ernst", buff: "", nerf: "" },
+            "jolly": { name: "Froh", buff: "Ini", nerf: "SpA" },
+            "naive": { name: "Naiv", buff: "Ini", nerf: "SpV" },
+            "modest": { name: "Mäßig", buff: "SpA", nerf: "Ang" },
+            "mild": { name: "Mild", buff: "SpA", nerf: "Ver" },
+            "quiet": { name: "Ruhig", buff: "SpA", nerf: "Ini" },
+            "bashful": { name: "Zaghaft", buff: "", nerf: "" },
+            "rash": { name: "Hitzig", buff: "SpA", nerf: "SpV" },
+            "calm": { name: "Still", buff: "SpV", nerf: "Ang" },
+            "gentle": { name: "Zart", buff: "SpV", nerf: "Ver" },
+            "sassy": { name: "Forsch", buff: "SpV", nerf: "Ini" },
+            "careful": { name: "Sacht", buff: "SpV", nerf: "SpA" },
+            "quirky": { name: "Kauzig", buff: "", nerf: "" }
+        };
+
+        const TYPE_TRANSLATIONS = {
+            "normal": "Normal", "fighting": "Kampf", "flying": "Flug",
+            "poison": "Gift", "ground": "Boden", "rock": "Gestein",
+            "bug": "Käfer", "ghost": "Geist", "steel": "Stahl",
+            "fire": "Feuer", "water": "Wasser", "grass": "Pflanze",
+            "electric": "Elektro", "psychic": "Psycho", "ice": "Eis",
+            "dragon": "Drache", "dark": "Unlicht", "fairy": "Fee"
+        };
+
+        // --- HAUPTKOMPONENTE ---
+        function PokemonGenerator() {
+            const [currentPokemon, setCurrentPokemon] = useState(null);
+            const [team, setTeam] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [totalPokemonCount, setTotalPokemonCount] = useState(0);
+
+            useEffect(() => {
+                fetch('https://pokeapi.co/api/v2/pokemon?limit=1')
+                    .then(res => res.json())
+                    .then(data => setTotalPokemonCount(data.count))
+                    .catch(console.error);
+            }, []);
+
+            const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+            const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+            const getWikiLink = (name) => `https://www.pokewiki.de/${name.replace(/ /g, '_')}`;
+
+            const getGermanName = (names, fallback) => {
+                const deEntry = names.find((n) => n.language.name === 'de');
+                return deEntry ? deEntry.name : capitalize(fallback);
+            };
+
+            const formatDisplayName = (germanSpeciesName, technicalName) => {
+                if (technicalName.includes('-mega-x')) return `${germanSpeciesName} (Mega X)`;
+                if (technicalName.includes('-mega-y')) return `${germanSpeciesName} (Mega Y)`;
+                if (technicalName.includes('-mega')) return `${germanSpeciesName} (Mega)`;
+                if (technicalName.includes('-alola')) return `${germanSpeciesName} (Alola)`;
+                if (technicalName.includes('-galar')) return `${germanSpeciesName} (Galar)`;
+                if (technicalName.includes('-hisui')) return `${germanSpeciesName} (Hisui)`;
+                if (technicalName.includes('-paldea')) return `${germanSpeciesName} (Paldea)`;
+                if (technicalName.includes('-gmax')) return `${germanSpeciesName} (Gigadynamax)`;
+                return germanSpeciesName;
+            };
+
+            const generatePokemon = async () => {
+                if (totalPokemonCount === 0) return;
+                
+                setLoading(true);
+                setError('');
+                
+                try {
+                    const randomIndex = getRandomInt(0, totalPokemonCount - 1);
+                    
+                    const listResponse = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=1&offset=${randomIndex}`);
+                    const listData = await listResponse.json();
+                    const pokemonUrl = listData.results[0].url;
+
+                    const response = await fetch(pokemonUrl);
+                    if (!response.ok) throw new Error('Pokemon konnte nicht gefangen werden!');
+                    const data = await response.json();
+
+                    const isShiny = getRandomInt(1, 4096) === 1;
+
+                    const speciesResponse = await fetch(data.species.url);
+                    const speciesData = await speciesResponse.json();
+
+                    const germanBaseName = getGermanName(speciesData.names, data.species.name);
+                    const displayName = formatDisplayName(germanBaseName, data.name);
+
+                    let gender = 'Geschlechtslos';
+                    const genderRate = speciesData.gender_rate;
+                    if (genderRate === -1) gender = 'Geschlechtslos';
+                    else if (genderRate === 0) gender = 'Männlich';
+                    else if (genderRate === 8) gender = 'Weiblich';
+                    else {
+                        const genderRoll = getRandomInt(1, 8);
+                        gender = genderRoll <= genderRate ? 'Weiblich' : 'Männlich';
+                    }
+
+                    const possibleMoves = data.moves.filter((m) => {
+                        const learnMethod = m.version_group_details[0]?.move_learn_method.name;
+                        return learnMethod === 'level-up' || learnMethod === 'machine';
+                    });
+
+                    const selectedMoveUrls = [];
+                    const movesPool = [...possibleMoves];
+                    
+                    for (let i = 0; i < 4; i++) {
+                        if (movesPool.length === 0) break;
+                        const randomIndex = getRandomInt(0, movesPool.length - 1);
+                        selectedMoveUrls.push(movesPool[randomIndex].move.url);
+                        movesPool.splice(randomIndex, 1);
+                    }
+
+                    const randomAbilityIndex = getRandomInt(0, data.abilities.length - 1);
+                    const abilityUrl = data.abilities[randomAbilityIndex].ability.url;
+
+                    const [abilityData, ...movesData] = await Promise.all([
+                        fetch(abilityUrl).then(r => r.json()),
+                        ...selectedMoveUrls.map(url => fetch(url).then(r => r.json()))
+                    ]);
+
+                    const germanAbility = getGermanName(abilityData.names, data.abilities[randomAbilityIndex].ability.name);
+                    
+                    const detailedMoves = movesData.map(m => ({
+                        name: getGermanName(m.names, m.name),
+                        type: TYPE_TRANSLATIONS[m.type.name] || capitalize(m.type.name),
+                        englishType: m.type.name,
+                        damageClass: m.damage_class.name
+                    }));
+
+                    while (detailedMoves.length < 4) {
+                        detailedMoves.push({
+                            name: "-",
+                            type: "Normal",
+                            englishType: "normal",
+                            damageClass: "status"
+                        });
+                    }
+
+                    const natureKeys = Object.keys(NATURE_TRANSLATIONS);
+                    const randomNatureKey = natureKeys[getRandomInt(0, natureKeys.length - 1)];
+                    const natureData = NATURE_TRANSLATIONS[randomNatureKey];
+
+                    const germanTypes = data.types.map((t) => TYPE_TRANSLATIONS[t.type.name] || capitalize(t.type.name));
+                    const englishTypes = data.types.map((t) => t.type.name);
+
+                    const newPokemon = {
+                        id: data.id,
+                        name: displayName,
+                        wikiName: germanBaseName,
+                        sprite: isShiny ? data.sprites.front_shiny : data.sprites.front_default,
+                        isShiny,
+                        types: germanTypes,
+                        englishTypes,
+                        moves: detailedMoves,
+                        ability: germanAbility,
+                        nature: natureData,
+                        gender,
+                        stats: {
+                            hp: data.stats[0].base_stat,
+                            atk: data.stats[1].base_stat,
+                            def: data.stats[2].base_stat,
+                            spa: data.stats[3].base_stat,
+                            spd: data.stats[4].base_stat,
+                            spe: data.stats[5].base_stat,
+                        }
+                    };
+
+                    setCurrentPokemon(newPokemon);
+
+                } catch (err) {
+                    setError('Ein wildes Fehler-Pokemon ist aufgetaucht. Bitte versuche es erneut.');
+                    console.error(err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const addToTeam = () => {
+                if (!currentPokemon) return;
+                if (team.length >= 6) {
+                    alert("Dein Team ist voll! (Max 6 Pokemon)");
+                    return;
+                }
+                setTeam([...team, currentPokemon]);
+            };
+
+            const removeFromTeam = (indexToRemove) => {
+                setTeam(team.filter((_, index) => index !== indexToRemove));
+            };
+
+            const getTypeColor = (type, isText = false) => {
+                const colors = {
+                    'fire': isText ? 'text-red-500' : 'bg-red-500', 
+                    'water': isText ? 'text-blue-500' : 'bg-blue-500', 
+                    'grass': isText ? 'text-green-500' : 'bg-green-500',
+                    'electric': isText ? 'text-yellow-400' : 'bg-yellow-400', 
+                    'ice': isText ? 'text-cyan-300' : 'bg-cyan-300', 
+                    'fighting': isText ? 'text-red-700' : 'bg-red-700',
+                    'poison': isText ? 'text-purple-500' : 'bg-purple-500', 
+                    'ground': isText ? 'text-amber-600' : 'bg-amber-600', 
+                    'flying': isText ? 'text-indigo-300' : 'bg-indigo-300',
+                    'psychic': isText ? 'text-pink-500' : 'bg-pink-500', 
+                    'bug': isText ? 'text-lime-500' : 'bg-lime-500', 
+                    'rock': isText ? 'text-stone-500' : 'bg-stone-500',
+                    'ghost': isText ? 'text-purple-800' : 'bg-purple-800', 
+                    'dragon': isText ? 'text-indigo-600' : 'bg-indigo-600', 
+                    'steel': isText ? 'text-slate-400' : 'bg-slate-400',
+                    'fairy': isText ? 'text-pink-300' : 'bg-pink-300', 
+                    'normal': isText ? 'text-gray-400' : 'bg-gray-400', 
+                    'dark': isText ? 'text-slate-800' : 'bg-slate-800'
+                };
+                return colors[type] || (isText ? 'text-gray-400' : 'bg-gray-400');
+            };
+
+            const StatBar = ({ label, val, max = 255, colorClass }) => (
+                <div className="flex items-center gap-2 text-xs">
+                    <span className="w-8 font-bold text-slate-400">{label}</span>
+                    <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div className={`h-full ${colorClass}`} style={{width: `${Math.min(val / max * 100, 100)}%`}}></div>
+                    </div>
+                    <span className="w-8 text-right font-mono">{val}</span>
+                </div>
+            );
+
+            const DamageClassIcon = ({ damageClass }) => {
+                if (damageClass === 'physical') return <Sword size={14} className="text-orange-400" title="Physisch" />;
+                if (damageClass === 'special') return <Zap size={14} className="text-blue-400" title="Spezial" />;
+                return <Circle size={14} className="text-slate-400" title="Status" />;
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans">
+                    <div className="max-w-6xl mx-auto">
+                        
+                        <header className="mb-8 text-center">
+                            <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 mb-2">
+                                Poké-Randomizer
+                            </h1>
+                        </header>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            
+                            {/* Linke Spalte: Generator */}
+                            <div className="lg:col-span-1 flex flex-col gap-4">
+                                <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 relative overflow-hidden">
+                                    
+                                    {loading ? (
+                                        <div className="h-[600px] flex flex-col items-center justify-center animate-pulse">
+                                            <div className="w-24 h-24 bg-slate-700 rounded-full mb-4"></div>
+                                            <p className="text-slate-400">Suche im hohen Gras...</p>
+                                        </div>
+                                    ) : currentPokemon ? (
+                                        <div className="relative z-10">
+                                            {currentPokemon.isShiny && (
+                                                <div className="absolute top-0 right-0 animate-bounce z-20">
+                                                    <Sparkles className="text-yellow-400 w-8 h-8 fill-current" />
+                                                </div>
+                                            )}
+
+                                            <div className="flex flex-col items-center mb-6">
+                                                <a 
+                                                    href={getWikiLink(currentPokemon.wikiName)} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className={`w-40 h-40 flex items-center justify-center rounded-full bg-slate-700/50 mb-4 border-4 transition-transform hover:scale-105 cursor-pointer ${currentPokemon.isShiny ? 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]' : 'border-slate-600'}`}
+                                                    title="Auf PokéWiki ansehen"
+                                                >
+                                                    {currentPokemon.sprite ? (
+                                                        <img 
+                                                            src={currentPokemon.sprite} 
+                                                            alt={currentPokemon.name} 
+                                                            className="w-36 h-36 object-contain pixelated"
+                                                            style={{ imageRendering: 'pixelated' }}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-4xl">?</span>
+                                                    )}
+                                                </a>
+                                                
+                                                <a href={getWikiLink(currentPokemon.wikiName)} target="_blank" rel="noopener noreferrer" className="group text-center">
+                                                    <h2 className="text-3xl font-bold capitalize mb-1 flex flex-col md:flex-row items-center justify-center gap-2 group-hover:text-blue-400 transition-colors">
+                                                        <span>{currentPokemon.name}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            {currentPokemon.gender === 'Männlich' && <span className="text-blue-400 text-xl no-underline">♂</span>}
+                                                            {currentPokemon.gender === 'Weiblich' && <span className="text-pink-400 text-xl no-underline">♀</span>}
+                                                            <ExternalLink size={16} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400"/>
+                                                        </div>
+                                                    </h2>
+                                                </a>
+                                                
+                                                <div className="flex gap-2 mt-2">
+                                                    {currentPokemon.types.map((type, idx) => (
+                                                        <a 
+                                                            key={type} 
+                                                            href={getWikiLink(type)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`${getTypeColor(currentPokemon.englishTypes[idx])} text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm hover:brightness-110 transition-all cursor-pointer`}
+                                                        >
+                                                            {type}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Details Grid */}
+                                            <div className="grid grid-cols-2 gap-4 mb-6 bg-slate-900/50 p-4 rounded-xl">
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><Brain size={12}/> Wesen</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-semibold">{currentPokemon.nature.name}</span>
+                                                        {(currentPokemon.nature.buff || currentPokemon.nature.nerf) && (
+                                                            <span className="text-xs text-slate-400">
+                                                                (+{currentPokemon.nature.buff}, -{currentPokemon.nature.nerf})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><Dna size={12}/> Fähigkeit</span>
+                                                    <a 
+                                                        href={getWikiLink(currentPokemon.ability)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer" 
+                                                        className="font-semibold text-sm truncate hover:text-blue-400 transition-colors cursor-pointer"
+                                                    >
+                                                        {currentPokemon.ability}
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            {/* Moves */}
+                                            <div className="mb-6">
+                                                <span className="text-slate-400 text-xs uppercase tracking-wider mb-2 block flex items-center gap-1"><Swords size={12}/> Attacken-Set</span>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {currentPokemon.moves.map((move, idx) => (
+                                                        move.name !== "-" ? (
+                                                            <a 
+                                                                key={idx}
+                                                                href={getWikiLink(move.name)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="bg-slate-700 p-2 rounded text-sm hover:bg-slate-600 hover:text-blue-300 transition-colors cursor-pointer flex flex-col gap-1 border-l-4 border-transparent"
+                                                                style={{ borderLeftColor: getTypeColor(move.englishType).replace('bg-', 'var(--tw-colors-') }} 
+                                                            >
+                                                                <div className="flex justify-between items-center w-full">
+                                                                    <span className="truncate font-semibold text-xs">{move.name}</span>
+                                                                    <DamageClassIcon damageClass={move.damageClass} />
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <div className={`w-2 h-2 rounded-full ${getTypeColor(move.englishType)}`}></div>
+                                                                    <span className="text-[10px] text-slate-400">{move.type}</span>
+                                                                </div>
+                                                            </a>
+                                                        ) : (
+                                                            <div key={idx} className="bg-slate-700/50 p-2 rounded text-sm text-center text-slate-500 flex items-center justify-center">-</div>
+                                                        )
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Full Stats */}
+                                            <div className="space-y-1.5 bg-slate-900/30 p-3 rounded-lg">
+                                                <StatBar label="KP" val={currentPokemon.stats.hp} colorClass="bg-green-500" />
+                                                <StatBar label="Ang" val={currentPokemon.stats.atk} colorClass="bg-orange-500" />
+                                                <StatBar label="Ver" val={currentPokemon.stats.def} colorClass="bg-yellow-500" />
+                                                <StatBar label="SpA" val={currentPokemon.stats.spa} colorClass="bg-blue-400" />
+                                                <StatBar label="SpV" val={currentPokemon.stats.spd} colorClass="bg-indigo-400" />
+                                                <StatBar label="Ini" val={currentPokemon.stats.spe} colorClass="bg-pink-400" />
+                                            </div>
+
+                                        </div>
+                                    ) : (
+                                        <div className="h-[600px] flex flex-col items-center justify-center text-center p-8">
+                                            <Zap size={64} className="text-slate-600 mb-4" />
+                                            <p className="text-slate-400">Drücke auf "Rollen", um dein erstes Pokémon zu finden!</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button 
+                                        onClick={generatePokemon}
+                                        disabled={loading}
+                                        className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white p-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <RefreshCw className={loading ? 'animate-spin' : ''} />
+                                        {loading ? 'Sucht...' : 'Rollen'}
+                                    </button>
+                                    
+                                    <button 
+                                        onClick={addToTeam}
+                                        disabled={!currentPokemon || loading}
+                                        className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white p-4 rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Save />
+                                        Speichern
+                                    </button>
+                                </div>
+                                {error && <p className="text-red-400 text-center text-sm">{error}</p>}
+                            </div>
+
+                            {/* Rechte Spalte: Team */}
+                            <div className="lg:col-span-2">
+                                <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700 h-full">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-xl font-bold flex items-center gap-2">
+                                            Dein Team <span className="bg-slate-700 px-2 py-0.5 rounded text-sm text-slate-300">{team.length} / 6</span>
+                                        </h3>
+                                        {team.length > 0 && (
+                                            <button onClick={() => setTeam([])} className="text-xs text-red-400 hover:text-red-300 hover:underline">
+                                                Team leeren
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {team.length === 0 ? (
+                                        <div className="h-64 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center text-slate-500">
+                                            <p>Dein Team ist noch leer.</p>
+                                            <p className="text-sm mt-2">Füge Pokémon von der linken Seite hinzu.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {team.map((poke, index) => (
+                                                <div key={`${poke.id}-${index}`} className={`bg-slate-800 p-4 rounded-xl flex flex-col gap-3 border ${poke.isShiny ? 'border-yellow-500/50' : 'border-slate-600'} hover:border-slate-500 transition-colors group relative`}>
+                                                    
+                                                    <button 
+                                                        onClick={() => removeFromTeam(index)}
+                                                        className="absolute top-2 right-2 text-slate-500 hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 z-10"
+                                                        title="Freilassen"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+
+                                                    {/* Top Row: Sprite + Name + Basic Info */}
+                                                    <div className="flex gap-4 items-center">
+                                                        <div className="relative">
+                                                            <img 
+                                                                src={poke.sprite} 
+                                                                alt={poke.name} 
+                                                                className="w-16 h-16 object-contain pixelated"
+                                                                style={{ imageRendering: 'pixelated' }}
+                                                            />
+                                                            {poke.isShiny && <Sparkles size={12} className="absolute top-0 right-0 text-yellow-400 fill-current" />}
+                                                        </div>
+                                                        
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <a 
+                                                                    href={getWikiLink(poke.wikiName)} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="font-bold truncate text-lg hover:text-blue-400 hover:underline transition-colors cursor-pointer"
+                                                                >
+                                                                    {poke.name}
+                                                                </a>
+                                                                {poke.gender === 'Männlich' && <span className="text-blue-400 text-sm">♂</span>}
+                                                                {poke.gender === 'Weiblich' && <span className="text-pink-400 text-sm">♀</span>}
+                                                            </div>
+
+                                                            <div className="flex flex-wrap gap-1 mb-1">
+                                                                {poke.types.map((type, idx) => (
+                                                                    <span key={idx} className={`${getTypeColor(poke.englishTypes[idx])} text-white px-1.5 py-0.5 rounded text-[10px] font-bold`}>
+                                                                        {type}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                            
+                                                            <div className="flex gap-2 text-xs text-slate-300">
+                                                                <span className="bg-slate-700 px-1.5 rounded">{poke.nature.name}</span>
+                                                                <span className="bg-slate-700 px-1.5 rounded truncate max-w-[100px]">{poke.ability}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom Row: All 4 Moves */}
+                                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-400 border-t border-slate-700 pt-2">
+                                                        {poke.moves.map((m, i) => m.name !== "-" && (
+                                                            <div key={i} className="flex items-center gap-1 overflow-hidden">
+                                                                <DamageClassIcon damageClass={m.damageClass} />
+                                                                <span className="truncate">{m.name}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {[...Array(6 - team.length)].map((_, i) => (
+                                                <div key={`empty-${i}`} className="bg-slate-800/30 border border-slate-700/50 rounded-xl h-36 flex items-center justify-center">
+                                                    <span className="text-slate-600 text-2xl font-bold opacity-20">{team.length + i + 1}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PokemonGenerator />);
+    </script>
+</body>
+</html>
